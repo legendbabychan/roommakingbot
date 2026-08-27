@@ -1,0 +1,4 @@
+discord.py
+sudachipy
+sudachidict_core
+Flask
