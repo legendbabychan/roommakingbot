@@ -1,32 +1,29 @@
 import os
 import threading
-from flask import Flask
 import discord
 from discord import app_commands
 from discord.ext import commands
+from flask import Flask
 
-# --- RenderのダミーWebサーバー設定（スリープ防止・ポート監視用）---
+# ===================================================================
+# 1. Render用 Webサーバー設定 (Gunicornで運用)
+# ===================================================================
 app = Flask('')
 
 @app.route('/')
 def home():
     return "Bot is alive!"
 
-def run_flask():
-    # Renderが指定するポート（既定値10000）でWebサーバーを起動
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port)
-
-# バックグラウンドでFlaskサーバーを動かす
-threading.Thread(target=run_flask).start()
-
-# --- 以降は元のBot処理 ---
+# --- 基本設定 ---
 intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
+
+# Renderの環境変数 DISCORD_TOKEN から取得
 TOKEN = os.environ.get("DISCORD_TOKEN")
+
 
 # 閲覧権限の設定ヘルパー関数
 def get_overwrites(guild, is_private, selected_members, exec_user):
@@ -41,7 +38,7 @@ def get_overwrites(guild, is_private, selected_members, exec_user):
 
 
 # ===================================================================
-# 1. TRPG用 機能（/trpg）
+# 2. TRPG用 機能（/trpg）
 # ===================================================================
 class TRPGModal(discord.ui.Modal, title="TRPG部屋の作成設定"):
     session_name = discord.ui.TextInput(
@@ -154,7 +151,7 @@ class TRPGSelectView(discord.ui.View):
 
 
 # ===================================================================
-# 2. カスタムマッチ用 機能（/custom）
+# 3. カスタムマッチ用 機能（/custom）
 # ===================================================================
 class CustomModal(discord.ui.Modal, title="カスタム部屋の作成設定"):
     game_title = discord.ui.TextInput(
@@ -261,7 +258,7 @@ class CustomSelectView(discord.ui.View):
 
 
 # ===================================================================
-# 3. 上映会用 機能（/movie）
+# 4. 上映会用 機能（/movie）
 # ===================================================================
 class MovieModal(discord.ui.Modal, title="上映会部屋の作成設定"):
     title_name = discord.ui.TextInput(
@@ -347,7 +344,7 @@ class MovieSelectView(discord.ui.View):
 
 
 # ===================================================================
-# 4. その他・汎用 機能（/other）
+# 5. その他・汎用 機能（/other）
 # ===================================================================
 class OtherModal(discord.ui.Modal, title="部屋の作成設定"):
     category_name = discord.ui.TextInput(
@@ -436,7 +433,7 @@ class OtherSelectView(discord.ui.View):
 
 
 # ===================================================================
-# 5. ヘルプ機能（/help）
+# 6. ヘルプ機能（/help）
 # ===================================================================
 @bot.tree.command(name="help", description="ボットの使い方とコマンド一覧を表示します")
 async def help_command(interaction: discord.Interaction):
@@ -476,7 +473,7 @@ async def help_command(interaction: discord.Interaction):
 
 
 # ===================================================================
-# 6. コマンド登録とBot起動
+# 7. コマンド同期 ＆ バックグラウンドでBot起動
 # ===================================================================
 @bot.event
 async def on_ready():
@@ -485,7 +482,11 @@ async def on_ready():
     print("---------------------------------")
 
 
-if TOKEN:
-    bot.run(TOKEN)
-else:
-    print("エラー: DISCORD_TOKEN が設定されていません。Renderの環境変数を確認してください。")
+def run_bot():
+    if TOKEN:
+        bot.run(TOKEN)
+    else:
+        print("エラー: DISCORD_TOKEN が設定されていません。Renderの環境変数を確認してください。")
+
+# GunicornでWebサーバーが起動した際に、別スレッドでDiscord Botも同時に起動します
+threading.Thread(target=run_bot, daemon=True).start()
